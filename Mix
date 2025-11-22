@@ -262,7 +262,7 @@ local titleBarBottom = Instance.new("Frame"); titleBarBottom.Size = UDim2.new(1,
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -100, 1, 0)
 title.BackgroundTransparency = 1
-title.Text = "🎮 萬能控制器"
+title.Text = "🎮 貓玲的最常用腳本"
 title.TextSize = 20
 title.Font = Enum.Font.GothamBold
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
