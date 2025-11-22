@@ -1,11 +1,21 @@
--- Roblox 速度跳躍控制器
--- 將此腳本放入 StarterGui 或使用執行器執行
+-- Roblox 整合腳本：ShiftLock + 速度/跳躍/無限跳/鏡頭控制器
+-- 自動掛載至 CoreGui 以保持在最上層
+-- 包含無限跳躍功能
 
+-- 1. 防止重複執行清理舊介面
+local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- 載入 ShiftLock 腳本
+if CoreGui:FindFirstChild("ShiftLockUI") then CoreGui.ShiftLockUI:Destroy() end
+if CoreGui:FindFirstChild("SpeedJumpController") then CoreGui.SpeedJumpController:Destroy() end
+if playerGui:FindFirstChild("ShiftLockUI") then playerGui.ShiftLockUI:Destroy() end
+if playerGui:FindFirstChild("SpeedJumpController") then playerGui.SpeedJumpController:Destroy() end
+
+-------------------------------------------------------------------------
+-- 模組 A: ShiftLock 腳本 (優化版)
+-------------------------------------------------------------------------
 local function loadShiftLock()
     local ref = cloneref or function(x) return x end
     local S = function(n) return ref(game:GetService(n)) end
@@ -15,23 +25,19 @@ local function loadShiftLock()
 
     local plr = Plrs.LocalPlayer
 
-    local function NA(i)
-        if not i then return end
-        i.Name = "\0"
-        i.Archivable = false
-    end
-
+    -- UI 父級設置函數 (優先 CoreGui)
     local function parentUI(g)
         if gethui then
-            NA(g); g.Parent = gethui(); return g
-        elseif CG and CG:FindFirstChild("RobloxGui") then
-            NA(g); g.Parent = CG:FindFirstChild("RobloxGui"); return g
+            g.Name = "\0" .. g.Name -- 隱藏名稱
+            g.Parent = gethui()
+            return g
         elseif CG then
-            NA(g); g.Parent = CG; return g
-        elseif plr and plr:FindFirstChildWhichIsA("PlayerGui") then
-            NA(g); g.Parent = plr:FindFirstChildWhichIsA("PlayerGui"); g.ResetOnSpawn = false; return g
+            g.Parent = CG
+            return g
+        else
+            g.Parent = plr:WaitForChild("PlayerGui")
+            return g
         end
-        return g
     end
 
     local function getParts()
@@ -86,7 +92,7 @@ local function loadShiftLock()
     gui.ResetOnSpawn = false
     gui.IgnoreGuiInset = true
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-    gui.DisplayOrder = 10000
+    gui.DisplayOrder = 10000 -- 確保在頂層
     parentUI(gui)
 
     local btn = Instance.new("ImageButton")
@@ -110,14 +116,6 @@ local function loadShiftLock()
     strk.Transparency = 0.25
     strk.Parent = btn
 
-    local grd = Instance.new("UIGradient")
-    grd.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(45,45,50)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(27,27,30))
-    }
-    grd.Rotation = 45
-    grd.Parent = btn
-
     local icn = Instance.new("ImageLabel")
     icn.Name = "Icn"
     icn.BackgroundTransparency = 1
@@ -129,157 +127,38 @@ local function loadShiftLock()
     icn.ScaleType = Enum.ScaleType.Fit
     icn.Parent = btn
 
-    local shd = Instance.new("Frame")
-    shd.Name = "Shd"
-    shd.AnchorPoint = Vector2.new(0.5, 0.5)
-    shd.Position = UDim2.new(btn.Position.X.Scale, btn.Position.X.Offset, btn.Position.Y.Scale, btn.Position.Y.Offset + 6)
-    shd.Size = UDim2.new(btn.Size.X.Scale, btn.Size.X.Offset + 12, btn.Size.Y.Scale, btn.Size.Y.Offset + 12)
-    shd.BackgroundColor3 = Color3.new(0,0,0)
-    shd.BackgroundTransparency = 0.8
-    shd.ZIndex = 0
-    shd.Parent = gui
-
-    local shdC = Instance.new("UICorner")
-    shdC.CornerRadius = UDim.new(1, 0)
-    shdC.Parent = shd
-
     local xBtn = Instance.new("TextButton")
     xBtn.Name = "Close"
     xBtn.AnchorPoint = Vector2.new(1, 0)
     xBtn.Position = UDim2.new(1, 6, 0, -6)
     xBtn.Size = UDim2.fromOffset(22, 22)
     xBtn.BackgroundColor3 = Color3.fromRGB(230, 60, 60)
-    xBtn.AutoButtonColor = true
     xBtn.Text = "×"
-    xBtn.TextScaled = true
     xBtn.TextColor3 = Color3.new(1,1,1)
     xBtn.Parent = btn
+    local xC = Instance.new("UICorner"); xC.CornerRadius = UDim.new(1,0); xC.Parent = xBtn
 
-    local xC = Instance.new("UICorner")
-    xC.CornerRadius = UDim.new(1,0)
-    xC.Parent = xBtn
-
-    local xS = Instance.new("UIStroke")
-    xS.Thickness = 1
-    xS.Transparency = 0.3
-    xS.Parent = xBtn
-
-    local sc = Instance.new("UIScale")
-    sc.Scale = 0.9
-    sc.Parent = btn
-    Tw:Create(sc, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Scale = 1}):Play()
-
-    local tH = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    local tP = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    local tT = TweenInfo.new(0.18, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
-    local tLoop = TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true, 0)
-
-    Tw:Create(strk, tLoop, {Transparency = 0.4}):Play()
-
-    local over = false
-    btn.MouseEnter:Connect(function()
-        over = true
-        Tw:Create(btn, tH, {Size = UDim2.fromOffset(70, 70)}):Play()
-    end)
-    btn.MouseLeave:Connect(function()
-        over = false
-        Tw:Create(btn, tH, {Size = UDim2.fromOffset(64, 64)}):Play()
-    end)
-
-    local function pulse()
-        local p = Instance.new("Frame")
-        p.Name = "Pulse"
-        p.AnchorPoint = Vector2.new(0.5,0.5)
-        p.Position = UDim2.fromScale(0.5,0.5)
-        p.Size = UDim2.fromOffset(0,0)
-        p.BackgroundColor3 = Color3.new(1,1,1)
-        p.BackgroundTransparency = 0.65
-        p.ZIndex = btn.ZIndex + 1
-        local pc = Instance.new("UICorner"); pc.CornerRadius = UDim.new(1,0); pc.Parent = p
-        p.Parent = btn
-        local m = math.max(btn.AbsoluteSize.X, btn.AbsoluteSize.Y) * 1.15
-        Tw:Create(p, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.fromOffset(m,m), BackgroundTransparency = 1}):Play()
-        task.delay(0.24, function() p:Destroy() end)
-    end
-
-    btn.MouseButton1Down:Connect(function()
-        Tw:Create(btn, tP, {Size = UDim2.fromOffset(58,58)}):Play()
-        Tw:Create(strk, tP, {Thickness = 3, Transparency = 0.1}):Play()
-        pulse()
-    end)
-    btn.MouseButton1Up:Connect(function()
-        Tw:Create(btn, tP, {Size = over and UDim2.fromOffset(70,70) or UDim2.fromOffset(64,64)}):Play()
-        Tw:Create(strk, tP, {Thickness = 2, Transparency = 0.25}):Play()
-    end)
-
-    local function shn()
-        local s = Instance.new("Frame")
-        s.Name = "Shn"
-        s.BackgroundTransparency = 1
-        s.Size = UDim2.fromScale(1,1)
-        s.ClipsDescendants = true
-        s.Parent = btn
-
-        local b = Instance.new("Frame")
-        b.AnchorPoint = Vector2.new(0.5,0.5)
-        b.Position = UDim2.fromScale(-0.2, 0.5)
-        b.Size = UDim2.new(0, 10, 1.4, 0)
-        b.BackgroundColor3 = Color3.fromRGB(255,255,255)
-        b.BackgroundTransparency = 0.85
-        local g = Instance.new("UIGradient")
-        g.Transparency = NumberSequence.new{
-            NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(0.5, 0.5),
-            NumberSequenceKeypoint.new(1, 1)
-        }
-        g.Rotation = 20
-        g.Parent = b
-        b.Parent = s
-
-        local tw = Tw:Create(b, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = UDim2.fromScale(1.2, 0.5)})
-        tw:Play()
-        tw.Completed:Connect(function() s:Destroy() end)
-    end
-
-    local drag = false
-    local dStart, pStart
-
-    local function clampUD(pos)
-        local scr = gui.AbsoluteSize
-        local half = btn.AbsoluteSize/2
-        local absX = pos.X.Scale * scr.X + pos.X.Offset
-        local absY = pos.Y.Scale * scr.Y + pos.Y.Offset
-        local x = math.clamp(absX, half.X + 8, scr.X - half.X - 8)
-        local y = math.clamp(absY, half.Y + 8, scr.Y - half.Y - 8)
-        return UDim2.new(pos.X.Scale, x - pos.X.Scale * scr.X, pos.Y.Scale, y - pos.Y.Scale * scr.Y)
-    end
-
-    btn.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-            drag = true
-            dStart = i.Position
-            pStart = btn.Position
-            i.Changed:Connect(function()
-                if i.UserInputState == Enum.UserInputState.End then
-                    drag = false
-                end
+    local dragging, dragInput, dragStart, startPos
+    btn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = btn.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
             end)
         end
     end)
-
-    btn.InputChanged:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then
-            if drag and dStart and pStart then
-                local d = i.Position - dStart
-                local np = UDim2.new(pStart.X.Scale, pStart.X.Offset + d.X, pStart.Y.Scale, pStart.Y.Offset + d.Y)
-                btn.Position = clampUD(np)
-            end
+    btn.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
         end
     end)
-
-    RS.RenderStepped:Connect(function()
-        shd.Position = UDim2.new(btn.Position.X.Scale, btn.Position.X.Offset, btn.Position.Y.Scale, btn.Position.Y.Offset + 6)
-        shd.Size = UDim2.new(btn.Size.X.Scale, btn.Size.X.Offset + 12, btn.Size.Y.Scale, btn.Size.Y.Offset + 12)
+    UIS.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            btn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
     end)
 
     local on = false
@@ -290,102 +169,41 @@ local function loadShiftLock()
         on = v
         lockMouse(v)
         faceCam(h, r, v)
-        Tw:Create(strk, tT, {Color = v and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(0, 140, 255), Thickness = v and 3 or 2}):Play()
-        Tw:Create(btn, tT, {BackgroundColor3 = v and Color3.fromRGB(38, 48, 60) or Color3.fromRGB(34, 34, 38)}):Play()
-        Tw:Create(icn, tT, {ImageColor3 = v and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(255,255,255)}):Play()
+        Tw:Create(strk, TweenInfo.new(0.2), {Color = v and Color3.fromRGB(0, 200, 255) or Color3.fromRGB(0, 140, 255), Thickness = v and 3 or 2}):Play()
+        Tw:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = v and Color3.fromRGB(38, 48, 60) or Color3.fromRGB(34, 34, 38)}):Play()
         icn.Image = v and icOn or icOff
-        shn()
     end
 
-    btn.Activated:Connect(function()
-        apply(not on)
-    end)
-
-    xBtn.Activated:Connect(function()
-        if on then apply(false) end
-        Tw:Create(sc, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0.8}):Play()
-        Tw:Create(btn, TweenInfo.new(0.18, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {BackgroundTransparency = 1}):Play()
-        Tw:Create(strk, TweenInfo.new(0.12), {Transparency = 1}):Play()
-        task.delay(0.2, function() gui:Destroy() end)
-    end)
-
-    plr.CharacterAdded:Connect(function()
-        reapply(on)
-    end)
-
-    local lastCam = Wk.CurrentCamera
-    Wk:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
-        local c = Wk.CurrentCamera
-        if c ~= lastCam then
-            lastCam = c
-            reapply(on)
-        end
-    end)
-
-    -- 自動啟動 ShiftLock
+    btn.Activated:Connect(function() apply(not on) end)
+    xBtn.Activated:Connect(function() if on then apply(false) end gui:Destroy() end)
+    plr.CharacterAdded:Connect(function() reapply(on) end)
+    
+    -- 自動啟動
     task.wait(0.5)
     apply(true)
-    
-    print("ShiftLock 已載入並自動啟動!")
+    print("ShiftLock 載入完成")
 end
 
--- 載入 ShiftLock
-pcall(loadShiftLock)
+-- 執行 ShiftLock
+task.spawn(function() pcall(loadShiftLock) end)
 
--- 創建 GUI (移到 ShiftLock 之後)
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "SpeedJumpController"
-screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-screenGui.DisplayOrder = 10001
-
--- 嘗試使用與 ShiftLock 相同的 parent 方法
-local function parentUI(g)
-    if gethui then
-        g.Name = "\0"
-        g.Archivable = false
-        g.Parent = gethui()
-        return g
-    elseif game:GetService("CoreGui") and game:GetService("CoreGui"):FindFirstChild("RobloxGui") then
-        g.Name = "\0"
-        g.Archivable = false
-        g.Parent = game:GetService("CoreGui"):FindFirstChild("RobloxGui")
-        return g
-    elseif game:GetService("CoreGui") then
-        g.Name = "\0"
-        g.Archivable = false
-        g.Parent = game:GetService("CoreGui")
-        return g
-    else
-        g.Parent = playerGui
-        return g
-    end
-end
-
-parentUI(screenGui)
+-------------------------------------------------------------------------
+-- 模組 B: 速度/跳躍/無限跳/鏡頭控制器
+-------------------------------------------------------------------------
 
 local originalSpeed = 16
 local originalJump = 50
 local originalCamDistance = 12.5
-
--- 標記是否已經保存過原始值
 local hasOriginalValues = false
 
--- 獲取原始數值 (只在所有功能都未啟動時才獲取)
+-- 獲取原始數值
 local function getOriginalValues()
-    -- 只有當所有功能都未啟動時才獲取原始值
-    if speedActive or jumpActive or camActive then
-        return
-    end
-    
+    if speedActive or jumpActive or camActive or infJumpActive then return end
     local character = player.Character
     if character then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
         if humanoid then
             originalSpeed = humanoid.WalkSpeed
-            
-            -- 優先使用 JumpHeight (新版)，如果不存在則使用 JumpPower (舊版)
             if humanoid.UseJumpPower then
                 originalJump = humanoid.JumpPower
             else
@@ -393,7 +211,6 @@ local function getOriginalValues()
             end
         end
     end
-    
     originalCamDistance = player.CameraMaxZoomDistance
     hasOriginalValues = true
 end
@@ -404,13 +221,27 @@ screenGui.Name = "SpeedJumpController"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-screenGui.DisplayOrder = 10001
-screenGui.Parent = playerGui
+screenGui.DisplayOrder = 10001 -- 比 ShiftLock 更高一點
 
--- 主框架
+-- 掛載到 CoreGui
+local function parentUI(g)
+    local success, err = pcall(function()
+        if gethui then
+            g.Parent = gethui()
+        elseif game:GetService("CoreGui") then
+            g.Parent = game:GetService("CoreGui")
+        else
+            g.Parent = playerGui
+        end
+    end)
+    if not success then g.Parent = playerGui end
+end
+parentUI(screenGui)
+
+-- 主框架 (高度增加以容納新按鈕)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 400, 0, 310)
-mainFrame.Position = UDim2.new(0.5, -200, 0.6, -155)
+mainFrame.Size = UDim2.new(0, 400, 0, 380) -- 高度從 310 改為 380
+mainFrame.Position = UDim2.new(0.5, -200, 0.5, -190)
 mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
@@ -425,226 +256,111 @@ titleBar.Size = UDim2.new(1, 0, 0, 50)
 titleBar.BackgroundColor3 = Color3.fromRGB(102, 126, 234)
 titleBar.BorderSizePixel = 0
 titleBar.Parent = mainFrame
+local titleBarCorner = Instance.new("UICorner"); titleBarCorner.CornerRadius = UDim.new(0, 15); titleBarCorner.Parent = titleBar
+local titleBarBottom = Instance.new("Frame"); titleBarBottom.Size = UDim2.new(1, 0, 0, 15); titleBarBottom.Position = UDim2.new(0, 0, 1, -15); titleBarBottom.BackgroundColor3 = Color3.fromRGB(102, 126, 234); titleBarBottom.BorderSizePixel = 0; titleBarBottom.Parent = titleBar
 
-local titleBarCorner = Instance.new("UICorner")
-titleBarCorner.CornerRadius = UDim.new(0, 15)
-titleBarCorner.Parent = titleBar
-
-local titleBarBottom = Instance.new("Frame")
-titleBarBottom.Size = UDim2.new(1, 0, 0, 15)
-titleBarBottom.Position = UDim2.new(0, 0, 1, -15)
-titleBarBottom.BackgroundColor3 = Color3.fromRGB(102, 126, 234)
-titleBarBottom.BorderSizePixel = 0
-titleBarBottom.Parent = titleBar
-
--- 標題
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -100, 1, 0)
 title.BackgroundTransparency = 1
-title.Text = "🎮 速度跳躍控制器"
+title.Text = "🎮 萬能控制器"
 title.TextSize = 20
 title.Font = Enum.Font.GothamBold
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Parent = titleBar
 
--- 縮小按鈕
+-- 縮小/關閉按鈕
 local minimizeButton = Instance.new("TextButton")
 minimizeButton.Size = UDim2.new(0, 40, 0, 40)
 minimizeButton.Position = UDim2.new(1, -90, 0, 5)
 minimizeButton.BackgroundColor3 = Color3.fromRGB(158, 158, 158)
-minimizeButton.BorderSizePixel = 0
-minimizeButton.Text = "─"
-minimizeButton.TextSize = 20
-minimizeButton.Font = Enum.Font.GothamBold
-minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-minimizeButton.Parent = titleBar
+minimizeButton.Text = "─"; minimizeButton.TextSize = 20; minimizeButton.Font = Enum.Font.GothamBold; minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255); minimizeButton.Parent = titleBar
+local minCorner = Instance.new("UICorner"); minCorner.CornerRadius = UDim.new(0, 8); minCorner.Parent = minimizeButton
 
-local minimizeCorner = Instance.new("UICorner")
-minimizeCorner.CornerRadius = UDim.new(0, 8)
-minimizeCorner.Parent = minimizeButton
-
--- 關閉按鈕
 local closeButton = Instance.new("TextButton")
 closeButton.Size = UDim2.new(0, 40, 0, 40)
 closeButton.Position = UDim2.new(1, -45, 0, 5)
 closeButton.BackgroundColor3 = Color3.fromRGB(244, 67, 54)
-closeButton.BorderSizePixel = 0
-closeButton.Text = "X"
-closeButton.TextSize = 20
-closeButton.Font = Enum.Font.GothamBold
-closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.Parent = titleBar
+closeButton.Text = "X"; closeButton.TextSize = 20; closeButton.Font = Enum.Font.GothamBold; closeButton.TextColor3 = Color3.fromRGB(255, 255, 255); closeButton.Parent = titleBar
+local closeCorner = Instance.new("UICorner"); closeCorner.CornerRadius = UDim.new(0, 8); closeCorner.Parent = closeButton
 
-local closeCorner = Instance.new("UICorner")
-closeCorner.CornerRadius = UDim.new(0, 8)
-closeCorner.Parent = closeButton
+-- 通用函數：創建控制行
+local function createControlRow(parent, yPos, labelText, placeholder, defaultVal, isInput)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0.9, 0, 0, 50)
+    frame.Position = UDim2.new(0.05, 0, 0, yPos)
+    frame.BackgroundColor3 = Color3.fromRGB(248, 249, 250)
+    frame.BorderSizePixel = 0
+    frame.Parent = parent
+    local fCorner = Instance.new("UICorner"); fCorner.CornerRadius = UDim.new(0, 10); fCorner.Parent = frame
 
--- 速度控制行
-local speedFrame = Instance.new("Frame")
-speedFrame.Size = UDim2.new(0.9, 0, 0, 50)
-speedFrame.Position = UDim2.new(0.05, 0, 0, 70)
-speedFrame.BackgroundColor3 = Color3.fromRGB(248, 249, 250)
-speedFrame.BorderSizePixel = 0
-speedFrame.Parent = mainFrame
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0, 70, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextSize = 18
+    label.Font = Enum.Font.GothamBold
+    label.TextColor3 = Color3.fromRGB(85, 85, 85)
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
 
-local speedCorner = Instance.new("UICorner")
-speedCorner.CornerRadius = UDim.new(0, 10)
-speedCorner.Parent = speedFrame
+    local input
+    if isInput then
+        input = Instance.new("TextBox")
+        input.Size = UDim2.new(0, 120, 0, 35)
+        input.Position = UDim2.new(0, 85, 0, 7.5)
+        input.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        input.BorderColor3 = Color3.fromRGB(221, 221, 221)
+        input.BorderSizePixel = 2
+        input.Text = defaultVal
+        input.TextSize = 16
+        input.Font = Enum.Font.Gotham
+        input.TextColor3 = Color3.fromRGB(50, 50, 50)
+        input.PlaceholderText = placeholder
+        input.Parent = frame
+        local iCorner = Instance.new("UICorner"); iCorner.CornerRadius = UDim.new(0, 8); iCorner.Parent = input
+    else
+        -- 為了無限跳，只顯示狀態文字
+        input = Instance.new("TextLabel")
+        input.Size = UDim2.new(0, 120, 0, 35)
+        input.Position = UDim2.new(0, 85, 0, 7.5)
+        input.BackgroundTransparency = 1
+        input.Text = "關閉"
+        input.TextSize = 16
+        input.Font = Enum.Font.Gotham
+        input.TextColor3 = Color3.fromRGB(150, 150, 150)
+        input.TextXAlignment = Enum.TextXAlignment.Center
+        input.Parent = frame
+    end
 
-local speedLabel = Instance.new("TextLabel")
-speedLabel.Size = UDim2.new(0, 70, 1, 0)
-speedLabel.Position = UDim2.new(0, 10, 0, 0)
-speedLabel.BackgroundTransparency = 1
-speedLabel.Text = "速度:"
-speedLabel.TextSize = 18
-speedLabel.Font = Enum.Font.GothamBold
-speedLabel.TextColor3 = Color3.fromRGB(85, 85, 85)
-speedLabel.TextXAlignment = Enum.TextXAlignment.Left
-speedLabel.Parent = speedFrame
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 90, 0, 35)
+    btn.Position = UDim2.new(1, -100, 0, 7.5)
+    btn.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
+    btn.BorderSizePixel = 0
+    btn.Text = "啟動"
+    btn.TextSize = 16
+    btn.Font = Enum.Font.GothamBold
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Parent = frame
+    local bCorner = Instance.new("UICorner"); bCorner.CornerRadius = UDim.new(0, 8); bCorner.Parent = btn
 
-local speedInput = Instance.new("TextBox")
-speedInput.Size = UDim2.new(0, 120, 0, 35)
-speedInput.Position = UDim2.new(0, 85, 0, 7.5)
-speedInput.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-speedInput.BorderColor3 = Color3.fromRGB(221, 221, 221)
-speedInput.BorderSizePixel = 2
-speedInput.Text = "70"
-speedInput.TextSize = 16
-speedInput.Font = Enum.Font.Gotham
-speedInput.TextColor3 = Color3.fromRGB(50, 50, 50)
-speedInput.PlaceholderText = "輸入速度"
-speedInput.Parent = speedFrame
+    return frame, input, btn
+end
 
-local speedInputCorner = Instance.new("UICorner")
-speedInputCorner.CornerRadius = UDim.new(0, 8)
-speedInputCorner.Parent = speedInput
+-- 1. 速度控制 (Y=70)
+local speedFrame, speedInput, speedButton = createControlRow(mainFrame, 70, "速度:", "輸入速度", "70", true)
 
-local speedButton = Instance.new("TextButton")
-speedButton.Size = UDim2.new(0, 90, 0, 35)
-speedButton.Position = UDim2.new(1, -100, 0, 7.5)
-speedButton.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
-speedButton.BorderSizePixel = 0
-speedButton.Text = "啟動"
-speedButton.TextSize = 16
-speedButton.Font = Enum.Font.GothamBold
-speedButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-speedButton.Parent = speedFrame
+-- 2. 跳躍控制 (Y=135)
+local jumpFrame, jumpInput, jumpButton = createControlRow(mainFrame, 135, "跳躍:", "輸入跳躍", "75", true)
 
-local speedBtnCorner = Instance.new("UICorner")
-speedBtnCorner.CornerRadius = UDim.new(0, 8)
-speedBtnCorner.Parent = speedButton
+-- 3. 無限跳控制 (Y=200, 新增)
+local infJumpFrame, infJumpStatus, infJumpButton = createControlRow(mainFrame, 200, "無限跳:", "", "", false)
 
--- 跳躍控制行
-local jumpFrame = Instance.new("Frame")
-jumpFrame.Size = UDim2.new(0.9, 0, 0, 50)
-jumpFrame.Position = UDim2.new(0.05, 0, 0, 135)
-jumpFrame.BackgroundColor3 = Color3.fromRGB(248, 249, 250)
-jumpFrame.BorderSizePixel = 0
-jumpFrame.Parent = mainFrame
+-- 4. 鏡頭距離 (Y=265, 下移)
+local camFrame, camInput, camButton = createControlRow(mainFrame, 265, "鏡頭:", "輸入距離", "120", true)
 
-local jumpCorner = Instance.new("UICorner")
-jumpCorner.CornerRadius = UDim.new(0, 10)
-jumpCorner.Parent = jumpFrame
-
-local jumpLabel = Instance.new("TextLabel")
-jumpLabel.Size = UDim2.new(0, 70, 1, 0)
-jumpLabel.Position = UDim2.new(0, 10, 0, 0)
-jumpLabel.BackgroundTransparency = 1
-jumpLabel.Text = "跳躍:"
-jumpLabel.TextSize = 18
-jumpLabel.Font = Enum.Font.GothamBold
-jumpLabel.TextColor3 = Color3.fromRGB(85, 85, 85)
-jumpLabel.TextXAlignment = Enum.TextXAlignment.Left
-jumpLabel.Parent = jumpFrame
-
-local jumpInput = Instance.new("TextBox")
-jumpInput.Size = UDim2.new(0, 120, 0, 35)
-jumpInput.Position = UDim2.new(0, 85, 0, 7.5)
-jumpInput.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-jumpInput.BorderColor3 = Color3.fromRGB(221, 221, 221)
-jumpInput.BorderSizePixel = 2
-jumpInput.Text = "75"
-jumpInput.TextSize = 16
-jumpInput.Font = Enum.Font.Gotham
-jumpInput.TextColor3 = Color3.fromRGB(50, 50, 50)
-jumpInput.PlaceholderText = "輸入跳躍力"
-jumpInput.Parent = jumpFrame
-
-local jumpInputCorner = Instance.new("UICorner")
-jumpInputCorner.CornerRadius = UDim.new(0, 8)
-jumpInputCorner.Parent = jumpInput
-
-local jumpButton = Instance.new("TextButton")
-jumpButton.Size = UDim2.new(0, 90, 0, 35)
-jumpButton.Position = UDim2.new(1, -100, 0, 7.5)
-jumpButton.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
-jumpButton.BorderSizePixel = 0
-jumpButton.Text = "啟動"
-jumpButton.TextSize = 16
-jumpButton.Font = Enum.Font.GothamBold
-jumpButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-jumpButton.Parent = jumpFrame
-
-local jumpBtnCorner = Instance.new("UICorner")
-jumpBtnCorner.CornerRadius = UDim.new(0, 8)
-jumpBtnCorner.Parent = jumpButton
-
--- 鏡頭距離控制行
-local camFrame = Instance.new("Frame")
-camFrame.Size = UDim2.new(0.9, 0, 0, 50)
-camFrame.Position = UDim2.new(0.05, 0, 0, 200)
-camFrame.BackgroundColor3 = Color3.fromRGB(248, 249, 250)
-camFrame.BorderSizePixel = 0
-camFrame.Parent = mainFrame
-
-local camCorner = Instance.new("UICorner")
-camCorner.CornerRadius = UDim.new(0, 10)
-camCorner.Parent = camFrame
-
-local camLabel = Instance.new("TextLabel")
-camLabel.Size = UDim2.new(0, 70, 1, 0)
-camLabel.Position = UDim2.new(0, 10, 0, 0)
-camLabel.BackgroundTransparency = 1
-camLabel.Text = "鏡頭:"
-camLabel.TextSize = 18
-camLabel.Font = Enum.Font.GothamBold
-camLabel.TextColor3 = Color3.fromRGB(85, 85, 85)
-camLabel.TextXAlignment = Enum.TextXAlignment.Left
-camLabel.Parent = camFrame
-
-local camInput = Instance.new("TextBox")
-camInput.Size = UDim2.new(0, 120, 0, 35)
-camInput.Position = UDim2.new(0, 85, 0, 7.5)
-camInput.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-camInput.BorderColor3 = Color3.fromRGB(221, 221, 221)
-camInput.BorderSizePixel = 2
-camInput.Text = "120"
-camInput.TextSize = 16
-camInput.Font = Enum.Font.Gotham
-camInput.TextColor3 = Color3.fromRGB(50, 50, 50)
-camInput.PlaceholderText = "輸入鏡頭距離"
-camInput.Parent = camFrame
-
-local camInputCorner = Instance.new("UICorner")
-camInputCorner.CornerRadius = UDim.new(0, 8)
-camInputCorner.Parent = camInput
-
-local camButton = Instance.new("TextButton")
-camButton.Size = UDim2.new(0, 90, 0, 35)
-camButton.Position = UDim2.new(1, -100, 0, 7.5)
-camButton.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
-camButton.BorderSizePixel = 0
-camButton.Text = "啟動"
-camButton.TextSize = 16
-camButton.Font = Enum.Font.GothamBold
-camButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-camButton.Parent = camFrame
-
-local camBtnCorner = Instance.new("UICorner")
-camBtnCorner.CornerRadius = UDim.new(0, 8)
-camBtnCorner.Parent = camButton
-
--- 狀態顯示
+-- 狀態顯示 (底部)
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(0.9, 0, 0, 40)
 statusLabel.Position = UDim2.new(0.05, 0, 1, -50)
@@ -655,83 +371,52 @@ statusLabel.TextSize = 14
 statusLabel.Font = Enum.Font.GothamBold
 statusLabel.TextColor3 = Color3.fromRGB(198, 40, 40)
 statusLabel.Parent = mainFrame
-
-local statusCorner = Instance.new("UICorner")
-statusCorner.CornerRadius = UDim.new(0, 8)
-statusCorner.Parent = statusLabel
+local statCorner = Instance.new("UICorner"); statCorner.CornerRadius = UDim.new(0, 8); statCorner.Parent = statusLabel
 
 -- 縮小後的小視窗
 local miniFrame = Instance.new("Frame")
 miniFrame.Size = UDim2.new(0, 200, 0, 50)
 miniFrame.Position = UDim2.new(0.5, -100, 0, 30)
 miniFrame.BackgroundColor3 = Color3.fromRGB(102, 126, 234)
-miniFrame.BorderSizePixel = 0
 miniFrame.Visible = false
 miniFrame.Parent = screenGui
+local mCorner = Instance.new("UICorner"); mCorner.CornerRadius = UDim.new(0, 10); mCorner.Parent = miniFrame
+local miniTitle = Instance.new("TextLabel"); miniTitle.Size = UDim2.new(1, -50, 1, 0); miniTitle.BackgroundTransparency = 1; miniTitle.Text = "🎮 控制器"; miniTitle.TextSize = 18; miniTitle.Font = Enum.Font.GothamBold; miniTitle.TextColor3 = Color3.fromRGB(255, 255, 255); miniTitle.Parent = miniFrame
+local expandButton = Instance.new("TextButton"); expandButton.Size = UDim2.new(0, 40, 0, 40); expandButton.Position = UDim2.new(1, -45, 0, 5); expandButton.BackgroundColor3 = Color3.fromRGB(76, 175, 80); expandButton.Text = "+"; expandButton.TextSize = 24; expandButton.Font = Enum.Font.GothamBold; expandButton.TextColor3 = Color3.fromRGB(255, 255, 255); expandButton.Parent = miniFrame; local eCorner = Instance.new("UICorner"); eCorner.CornerRadius = UDim.new(0, 8); eCorner.Parent = expandButton
 
-local miniCorner = Instance.new("UICorner")
-miniCorner.CornerRadius = UDim.new(0, 10)
-miniCorner.Parent = miniFrame
-
-local miniTitle = Instance.new("TextLabel")
-miniTitle.Size = UDim2.new(1, -50, 1, 0)
-miniTitle.BackgroundTransparency = 1
-miniTitle.Text = "🎮 控制器"
-miniTitle.TextSize = 18
-miniTitle.Font = Enum.Font.GothamBold
-miniTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-miniTitle.Parent = miniFrame
-
-local expandButton = Instance.new("TextButton")
-expandButton.Size = UDim2.new(0, 40, 0, 40)
-expandButton.Position = UDim2.new(1, -45, 0, 5)
-expandButton.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
-expandButton.BorderSizePixel = 0
-expandButton.Text = "+"
-expandButton.TextSize = 24
-expandButton.Font = Enum.Font.GothamBold
-expandButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-expandButton.Parent = miniFrame
-
-local expandCorner = Instance.new("UICorner")
-expandCorner.CornerRadius = UDim.new(0, 8)
-expandCorner.Parent = expandButton
-
--- 變數
+-- 邏輯變數
 local speedActive = false
 local jumpActive = false
 local camActive = false
+local infJumpActive = false -- 無限跳變數
+
 local speedValue = 70
 local jumpValue = 75
 local camValue = 120
+
 local speedConnection = nil
 local jumpConnection = nil
 local camConnection = nil
+local infJumpConnection = nil
 
--- 獲取初始值 (等待角色載入後再獲取)
+-- 初始化原始值
 task.spawn(function()
     if player.Character then
-        task.wait(0.1) -- 等待遊戲設定初始值
+        task.wait(0.1)
         getOriginalValues()
     end
 end)
 
 -- 更新狀態函數
 local function updateStatus()
-    local statusParts = {}
+    local parts = {}
+    if speedActive then table.insert(parts, "速度") end
+    if jumpActive then table.insert(parts, "跳躍") end
+    if infJumpActive then table.insert(parts, "無限跳") end
+    if camActive then table.insert(parts, "鏡頭") end
     
-    if speedActive then
-        table.insert(statusParts, string.format("速度:%d", speedValue))
-    end
-    if jumpActive then
-        table.insert(statusParts, string.format("跳躍:%d", jumpValue))
-    end
-    if camActive then
-        table.insert(statusParts, string.format("鏡頭:%d", camValue))
-    end
-    
-    if #statusParts > 0 then
-        statusLabel.Text = "✅ " .. table.concat(statusParts, " | ") .. " - 已啟動"
+    if #parts > 0 then
+        statusLabel.Text = "✅ " .. table.concat(parts, " | ") .. " 已啟動"
         statusLabel.BackgroundColor3 = Color3.fromRGB(232, 245, 233)
         statusLabel.TextColor3 = Color3.fromRGB(46, 125, 50)
     else
@@ -741,321 +426,205 @@ local function updateStatus()
     end
 end
 
--- 速度控制
+-- === 速度控制 ===
 speedButton.MouseButton1Click:Connect(function()
-    local character = player.Character
-    if not character then return end
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
+    local char = player.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
     
     if not speedActive then
-        -- 在啟動前確保有原始值
-        if not hasOriginalValues then
-            getOriginalValues()
-        end
-        
-        -- 啟動
+        if not hasOriginalValues then getOriginalValues() end
         speedValue = tonumber(speedInput.Text) or 70
         speedActive = true
         speedButton.Text = "解除"
         speedButton.BackgroundColor3 = Color3.fromRGB(244, 67, 54)
         speedInput.TextEditable = false
-        speedInput.BackgroundColor3 = Color3.fromRGB(233, 236, 239)
         speedFrame.BackgroundColor3 = Color3.fromRGB(227, 242, 253)
         
-        -- 設定速度
-        humanoid.WalkSpeed = speedValue
-        
-        -- 監聽並鎖定速度
-        if speedConnection then
-            speedConnection:Disconnect()
-        end
-        speedConnection = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-            if speedActive then
-                humanoid.WalkSpeed = speedValue
-            end
+        hum.WalkSpeed = speedValue
+        if speedConnection then speedConnection:Disconnect() end
+        speedConnection = hum:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+            if speedActive then hum.WalkSpeed = speedValue end
         end)
     else
-        -- 解除
         speedActive = false
         speedButton.Text = "啟動"
         speedButton.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
         speedInput.TextEditable = true
-        speedInput.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         speedFrame.BackgroundColor3 = Color3.fromRGB(248, 249, 250)
-        
-        -- 恢復原始速度
-        humanoid.WalkSpeed = originalSpeed
-        
-        -- 斷開連接
-        if speedConnection then
-            speedConnection:Disconnect()
-            speedConnection = nil
-        end
+        hum.WalkSpeed = originalSpeed
+        if speedConnection then speedConnection:Disconnect() end
     end
-    
     updateStatus()
 end)
 
--- 鏡頭距離控制
-camButton.MouseButton1Click:Connect(function()
-    if not camActive then
-        -- 在啟動前確保有原始值
-        if not hasOriginalValues then
-            getOriginalValues()
-        end
-        
-        -- 啟動
-        camValue = tonumber(camInput.Text) or 120
-        camActive = true
-        camButton.Text = "解除"
-        camButton.BackgroundColor3 = Color3.fromRGB(244, 67, 54)
-        camInput.TextEditable = false
-        camInput.BackgroundColor3 = Color3.fromRGB(233, 236, 239)
-        camFrame.BackgroundColor3 = Color3.fromRGB(227, 242, 253)
-        
-        -- 設定鏡頭最大距離
-        player.CameraMaxZoomDistance = camValue
-        player.CameraMinZoomDistance = 0.5
-        
-        -- 使用 RunService 來平滑地拉遠鏡頭
-        local camera = workspace.CurrentCamera
-        local character = player.Character
-        
-        if character and character:FindFirstChild("HumanoidRootPart") then
-            local humanoidRootPart = character.HumanoidRootPart
-            
-            -- 等待一幀確保設定生效
-            task.wait()
-            
-            -- 獲取當前鏡頭相對玩家的方向和距離
-            local currentOffset = camera.CFrame.Position - humanoidRootPart.Position
-            local currentDirection = currentOffset.Unit
-            local currentDistance = currentOffset.Magnitude
-            
-            -- 計算新的鏡頭位置
-            local newPosition = humanoidRootPart.Position + currentDirection * camValue
-            
-            -- 設定新的鏡頭位置,保持看向玩家
-            camera.CFrame = CFrame.new(newPosition, humanoidRootPart.Position)
-            
-            print(string.format("鏡頭從距離 %.1f 拉遠到 %.1f", currentDistance, camValue))
-        end
-        
-        -- 只監控最大距離設定,不鎖定實際距離
-        if camConnection then
-            camConnection:Disconnect()
-        end
-        
-        camConnection = player:GetPropertyChangedSignal("CameraMaxZoomDistance"):Connect(function()
-            if camActive and player.CameraMaxZoomDistance ~= camValue then
-                player.CameraMaxZoomDistance = camValue
-            end
-        end)
-    else
-        -- 解除
-        camActive = false
-        camButton.Text = "啟動"
-        camButton.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
-        camInput.TextEditable = true
-        camInput.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        camFrame.BackgroundColor3 = Color3.fromRGB(248, 249, 250)
-        
-        -- 恢復原始鏡頭距離
-        player.CameraMaxZoomDistance = originalCamDistance
-        
-        -- 斷開連接
-        if camConnection then
-            camConnection:Disconnect()
-            camConnection = nil
-        end
-    end
-    
-    updateStatus()
-end)
-
--- 跳躍控制
+-- === 跳躍力控制 ===
 jumpButton.MouseButton1Click:Connect(function()
-    local character = player.Character
-    if not character then return end
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
+    local char = player.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
     
     if not jumpActive then
-        -- 在啟動前確保有原始值
-        if not hasOriginalValues then
-            getOriginalValues()
-        end
-        
-        -- 啟動
+        if not hasOriginalValues then getOriginalValues() end
         jumpValue = tonumber(jumpInput.Text) or 75
         jumpActive = true
         jumpButton.Text = "解除"
         jumpButton.BackgroundColor3 = Color3.fromRGB(244, 67, 54)
         jumpInput.TextEditable = false
-        jumpInput.BackgroundColor3 = Color3.fromRGB(233, 236, 239)
         jumpFrame.BackgroundColor3 = Color3.fromRGB(227, 242, 253)
         
-        -- 判斷使用哪種跳躍系統並設定
-        if humanoid.UseJumpPower then
-            -- 舊版跳躍系統 (JumpPower)
-            humanoid.JumpPower = jumpValue
-            
-            if jumpConnection then
-                jumpConnection:Disconnect()
-            end
-            jumpConnection = humanoid:GetPropertyChangedSignal("JumpPower"):Connect(function()
-                if jumpActive then
-                    humanoid.JumpPower = jumpValue
-                end
+        if hum.UseJumpPower then
+            hum.JumpPower = jumpValue
+            if jumpConnection then jumpConnection:Disconnect() end
+            jumpConnection = hum:GetPropertyChangedSignal("JumpPower"):Connect(function()
+                if jumpActive then hum.JumpPower = jumpValue end
             end)
         else
-            -- 新版跳躍系統 (JumpHeight)
-            humanoid.JumpHeight = jumpValue
-            
-            if jumpConnection then
-                jumpConnection:Disconnect()
-            end
-            jumpConnection = humanoid:GetPropertyChangedSignal("JumpHeight"):Connect(function()
-                if jumpActive then
-                    humanoid.JumpHeight = jumpValue
-                end
+            hum.JumpHeight = jumpValue
+            if jumpConnection then jumpConnection:Disconnect() end
+            jumpConnection = hum:GetPropertyChangedSignal("JumpHeight"):Connect(function()
+                if jumpActive then hum.JumpHeight = jumpValue end
             end)
         end
     else
-        -- 解除
         jumpActive = false
         jumpButton.Text = "啟動"
         jumpButton.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
         jumpInput.TextEditable = true
-        jumpInput.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         jumpFrame.BackgroundColor3 = Color3.fromRGB(248, 249, 250)
         
-        -- 恢復原始跳躍力
-        if humanoid.UseJumpPower then
-            humanoid.JumpPower = originalJump
-        else
-            humanoid.JumpHeight = originalJump
-        end
-        
-        -- 斷開連接
-        if jumpConnection then
-            jumpConnection:Disconnect()
-            jumpConnection = nil
-        end
+        if hum.UseJumpPower then hum.JumpPower = originalJump else hum.JumpHeight = originalJump end
+        if jumpConnection then jumpConnection:Disconnect() end
     end
-    
     updateStatus()
 end)
 
--- 縮小按鈕
-minimizeButton.MouseButton1Click:Connect(function()
-    mainFrame.Visible = false
-    miniFrame.Visible = true
-end)
-
--- 展開按鈕
-expandButton.MouseButton1Click:Connect(function()
-    miniFrame.Visible = false
-    mainFrame.Visible = true
-end)
-
--- 關閉按鈕
-closeButton.MouseButton1Click:Connect(function()
-    -- 先解除所有啟動的功能
-    local character = player.Character
-    if character then
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            if speedActive then
-                humanoid.WalkSpeed = originalSpeed
-            end
-            if jumpActive then
-                if humanoid.UseJumpPower then
-                    humanoid.JumpPower = originalJump
-                else
-                    humanoid.JumpHeight = originalJump
-                end
+-- === 無限跳控制 (新增邏輯) ===
+local UserInputService = game:GetService("UserInputService")
+infJumpConnection = UserInputService.JumpRequest:Connect(function()
+    if infJumpActive then
+        local char = player.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum:ChangeState(Enum.HumanoidStateType.Jumping)
             end
         end
     end
-    
-    if camActive then
+end)
+
+infJumpButton.MouseButton1Click:Connect(function()
+    if not infJumpActive then
+        infJumpActive = true
+        infJumpButton.Text = "解除"
+        infJumpButton.BackgroundColor3 = Color3.fromRGB(244, 67, 54)
+        infJumpStatus.Text = "開啟"
+        infJumpStatus.TextColor3 = Color3.fromRGB(46, 125, 50)
+        infJumpFrame.BackgroundColor3 = Color3.fromRGB(227, 242, 253)
+    else
+        infJumpActive = false
+        infJumpButton.Text = "啟動"
+        infJumpButton.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
+        infJumpStatus.Text = "關閉"
+        infJumpStatus.TextColor3 = Color3.fromRGB(150, 150, 150)
+        infJumpFrame.BackgroundColor3 = Color3.fromRGB(248, 249, 250)
+    end
+    updateStatus()
+end)
+
+-- === 鏡頭距離控制 ===
+camButton.MouseButton1Click:Connect(function()
+    if not camActive then
+        if not hasOriginalValues then getOriginalValues() end
+        camValue = tonumber(camInput.Text) or 120
+        camActive = true
+        camButton.Text = "解除"
+        camButton.BackgroundColor3 = Color3.fromRGB(244, 67, 54)
+        camInput.TextEditable = false
+        camFrame.BackgroundColor3 = Color3.fromRGB(227, 242, 253)
+        
+        player.CameraMaxZoomDistance = camValue
+        player.CameraMinZoomDistance = 0.5
+        
+        if camConnection then camConnection:Disconnect() end
+        camConnection = player:GetPropertyChangedSignal("CameraMaxZoomDistance"):Connect(function()
+            if camActive and player.CameraMaxZoomDistance ~= camValue then
+                player.CameraMaxZoomDistance = camValue
+            end
+        end)
+    else
+        camActive = false
+        camButton.Text = "啟動"
+        camButton.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
+        camInput.TextEditable = true
+        camFrame.BackgroundColor3 = Color3.fromRGB(248, 249, 250)
         player.CameraMaxZoomDistance = originalCamDistance
+        if camConnection then camConnection:Disconnect() end
     end
+    updateStatus()
+end)
+
+-- 視窗控制
+minimizeButton.MouseButton1Click:Connect(function() mainFrame.Visible = false; miniFrame.Visible = true end)
+expandButton.MouseButton1Click:Connect(function() miniFrame.Visible = false; mainFrame.Visible = true end)
+closeButton.MouseButton1Click:Connect(function()
+    -- 關閉前恢復
+    local char = player.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            if speedActive then hum.WalkSpeed = originalSpeed end
+            if jumpActive then
+                if hum.UseJumpPower then hum.JumpPower = originalJump else hum.JumpHeight = originalJump end
+            end
+        end
+    end
+    if camActive then player.CameraMaxZoomDistance = originalCamDistance end
     
-    -- 斷開所有連接
-    if speedConnection then
-        speedConnection:Disconnect()
-    end
-    if jumpConnection then
-        jumpConnection:Disconnect()
-    end
-    if camConnection then
-        camConnection:Disconnect()
-    end
+    if speedConnection then speedConnection:Disconnect() end
+    if jumpConnection then jumpConnection:Disconnect() end
+    if camConnection then camConnection:Disconnect() end
+    if infJumpConnection then infJumpConnection:Disconnect() end
     
-    -- 刪除 GUI
     screenGui:Destroy()
 end)
 
--- 當角色重生時重新應用設定和獲取新的原始值
-player.CharacterAdded:Connect(function(character)
-    local humanoid = character:WaitForChild("Humanoid")
-    
-    -- 重置原始值標記,等待新角色的初始值設定完成
+-- 重生處理
+player.CharacterAdded:Connect(function(char)
+    local hum = char:WaitForChild("Humanoid")
     hasOriginalValues = false
-    
-    -- 等待一小段時間讓遊戲設定原始值
-    wait(0.1)
-    
-    -- 如果所有功能都未啟動,獲取新的原始值
-    if not speedActive and not jumpActive and not camActive then
-        getOriginalValues()
-    end
+    task.wait(0.2)
+    if not (speedActive or jumpActive or camActive or infJumpActive) then getOriginalValues() end
     
     if speedActive then
-        humanoid.WalkSpeed = speedValue
-        if speedConnection then
-            speedConnection:Disconnect()
-        end
-        speedConnection = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-            if speedActive then
-                humanoid.WalkSpeed = speedValue
-            end
+        hum.WalkSpeed = speedValue
+        if speedConnection then speedConnection:Disconnect() end
+        speedConnection = hum:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+            if speedActive then hum.WalkSpeed = speedValue end
         end)
     end
     
     if jumpActive then
-        if humanoid.UseJumpPower then
-            humanoid.JumpPower = jumpValue
-            if jumpConnection then
-                jumpConnection:Disconnect()
-            end
-            jumpConnection = humanoid:GetPropertyChangedSignal("JumpPower"):Connect(function()
-                if jumpActive then
-                    humanoid.JumpPower = jumpValue
-                end
+        if hum.UseJumpPower then
+            hum.JumpPower = jumpValue
+            if jumpConnection then jumpConnection:Disconnect() end
+            jumpConnection = hum:GetPropertyChangedSignal("JumpPower"):Connect(function()
+                if jumpActive then hum.JumpPower = jumpValue end
             end)
         else
-            humanoid.JumpHeight = jumpValue
-            if jumpConnection then
-                jumpConnection:Disconnect()
-            end
-            jumpConnection = humanoid:GetPropertyChangedSignal("JumpHeight"):Connect(function()
-                if jumpActive then
-                    humanoid.JumpHeight = jumpValue
-                end
+            hum.JumpHeight = jumpValue
+            if jumpConnection then jumpConnection:Disconnect() end
+            jumpConnection = hum:GetPropertyChangedSignal("JumpHeight"):Connect(function()
+                if jumpActive then hum.JumpHeight = jumpValue end
             end)
         end
     end
     
     if camActive then
         player.CameraMaxZoomDistance = camValue
-        if camConnection then
-            camConnection:Disconnect()
-        end
-        
+        if camConnection then camConnection:Disconnect() end
         camConnection = player:GetPropertyChangedSignal("CameraMaxZoomDistance"):Connect(function()
             if camActive and player.CameraMaxZoomDistance ~= camValue then
                 player.CameraMaxZoomDistance = camValue
@@ -1064,79 +633,33 @@ player.CharacterAdded:Connect(function(character)
     end
 end)
 
--- 使主視窗可拖動
-local dragging
-local dragInput
-local dragStart
-local startPos
-
-local function update(input)
-    local delta = input.Position - dragStart
-    mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+-- 拖曳功能
+local function enableDrag(frame, handle)
+    local dragging, dragInput, dragStart, startPos
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    handle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
 end
 
-titleBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = mainFrame.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
+enableDrag(mainFrame, titleBar)
+enableDrag(miniFrame, miniFrame)
 
-titleBar.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        update(input)
-    end
-end)
-
--- 使縮小視窗可拖動
-local miniDragging
-local miniDragInput
-local miniDragStart
-local miniStartPos
-
-local function updateMini(input)
-    local delta = input.Position - miniDragStart
-    miniFrame.Position = UDim2.new(miniStartPos.X.Scale, miniStartPos.X.Offset + delta.X, miniStartPos.Y.Scale, miniStartPos.Y.Offset + delta.Y)
-end
-
-miniFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        miniDragging = true
-        miniDragStart = input.Position
-        miniStartPos = miniFrame.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                miniDragging = false
-            end
-        end)
-    end
-end)
-
-miniFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        miniDragInput = input
-    end
-end)
-
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if input == miniDragInput and miniDragging then
-        updateMini(input)
-    end
-end)
-
-print("速度跳躍控制器已載入!")
-print("跳躍系統:", player.Character and player.Character:FindFirstChildOfClass("Humanoid") and (player.Character:FindFirstChildOfClass("Humanoid").UseJumpPower and "JumpPower" or "JumpHeight") or "未知")
+print("速度/跳躍/無限跳控制器已載入 (CoreGui層級)")
