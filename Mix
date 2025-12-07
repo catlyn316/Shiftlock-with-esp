@@ -1,12 +1,13 @@
--- Roblox 整合腳本：ShiftLock + 速度/跳躍/無限跳/鏡頭控制器
+-- Roblox 整合腳本：ShiftLock + 速度/跳躍/無限跳/重力控制器
 -- 自動掛載至 CoreGui 以保持在最上層
--- 包含無限跳躍功能
+-- 修改版：鏡頭控制已替換為重力控制
 
 -- 1. 防止重複執行清理舊介面
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+local Workspace = game:GetService("Workspace") -- 獲取 Workspace 服務
 
 if CoreGui:FindFirstChild("ShiftLockUI") then CoreGui.ShiftLockUI:Destroy() end
 if CoreGui:FindFirstChild("SpeedJumpController") then CoreGui.SpeedJumpController:Destroy() end
@@ -188,17 +189,19 @@ end
 task.spawn(function() pcall(loadShiftLock) end)
 
 -------------------------------------------------------------------------
--- 模組 B: 速度/跳躍/無限跳/鏡頭控制器
+-- 模組 B: 速度/跳躍/無限跳/重力控制器
 -------------------------------------------------------------------------
 
 local originalSpeed = 16
 local originalJump = 50
-local originalCamDistance = 12.5
+local originalGravity = 196.2 -- 預設重力
 local hasOriginalValues = false
 
 -- 獲取原始數值
 local function getOriginalValues()
-    if speedActive or jumpActive or camActive or infJumpActive then return end
+    -- 如果已經啟動了功能，就不重複獲取，以免獲取到修改後的值
+    if speedActive or jumpActive or gravActive or infJumpActive then return end
+    
     local character = player.Character
     if character then
         local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -211,7 +214,7 @@ local function getOriginalValues()
             end
         end
     end
-    originalCamDistance = player.CameraMaxZoomDistance
+    originalGravity = Workspace.Gravity -- 獲取當前世界的重力
     hasOriginalValues = true
 end
 
@@ -238,9 +241,9 @@ local function parentUI(g)
 end
 parentUI(screenGui)
 
--- 主框架 (高度增加以容納新按鈕)
+-- 主框架
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 400, 0, 380) -- 高度從 310 改為 380
+mainFrame.Size = UDim2.new(0, 400, 0, 380)
 mainFrame.Position = UDim2.new(0.5, -200, 0.5, -190)
 mainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 mainFrame.BorderSizePixel = 0
@@ -262,7 +265,7 @@ local titleBarBottom = Instance.new("Frame"); titleBarBottom.Size = UDim2.new(1,
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -100, 1, 0)
 title.BackgroundTransparency = 1
-title.Text = "🎮 貓玲的最常用腳本"
+title.Text = "🎮 貓玲的全能控制器"
 title.TextSize = 20
 title.Font = Enum.Font.GothamBold
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -320,7 +323,6 @@ local function createControlRow(parent, yPos, labelText, placeholder, defaultVal
         input.Parent = frame
         local iCorner = Instance.new("UICorner"); iCorner.CornerRadius = UDim.new(0, 8); iCorner.Parent = input
     else
-        -- 為了無限跳，只顯示狀態文字
         input = Instance.new("TextLabel")
         input.Size = UDim2.new(0, 120, 0, 35)
         input.Position = UDim2.new(0, 85, 0, 7.5)
@@ -354,11 +356,12 @@ local speedFrame, speedInput, speedButton = createControlRow(mainFrame, 70, "速
 -- 2. 跳躍控制 (Y=135)
 local jumpFrame, jumpInput, jumpButton = createControlRow(mainFrame, 135, "跳躍:", "輸入跳躍", "75", true)
 
--- 3. 無限跳控制 (Y=200, 新增)
+-- 3. 無限跳控制 (Y=200)
 local infJumpFrame, infJumpStatus, infJumpButton = createControlRow(mainFrame, 200, "無限跳:", "", "", false)
 
--- 4. 鏡頭距離 (Y=265, 下移)
-local camFrame, camInput, camButton = createControlRow(mainFrame, 265, "鏡頭:", "輸入距離", "120", true)
+-- 4. 重力控制 (Y=265, 修改為重力)
+-- 預設值 50 代表低重力，正常是 196.2
+local gravFrame, gravInput, gravButton = createControlRow(mainFrame, 265, "重力:", "輸入重力", "50", true)
 
 -- 狀態顯示 (底部)
 local statusLabel = Instance.new("TextLabel")
@@ -387,16 +390,16 @@ local expandButton = Instance.new("TextButton"); expandButton.Size = UDim2.new(0
 -- 邏輯變數
 local speedActive = false
 local jumpActive = false
-local camActive = false
-local infJumpActive = false -- 無限跳變數
+local gravActive = false
+local infJumpActive = false
 
 local speedValue = 70
 local jumpValue = 75
-local camValue = 120
+local gravValue = 50
 
 local speedConnection = nil
 local jumpConnection = nil
-local camConnection = nil
+local gravConnection = nil -- 重力監聽 (如果需要)
 local infJumpConnection = nil
 
 -- 初始化原始值
@@ -413,7 +416,7 @@ local function updateStatus()
     if speedActive then table.insert(parts, "速度") end
     if jumpActive then table.insert(parts, "跳躍") end
     if infJumpActive then table.insert(parts, "無限跳") end
-    if camActive then table.insert(parts, "鏡頭") end
+    if gravActive then table.insert(parts, "重力") end
     
     if #parts > 0 then
         statusLabel.Text = "✅ " .. table.concat(parts, " | ") .. " 已啟動"
@@ -501,7 +504,7 @@ jumpButton.MouseButton1Click:Connect(function()
     updateStatus()
 end)
 
--- === 無限跳控制 (新增邏輯) ===
+-- === 無限跳控制 ===
 local UserInputService = game:GetService("UserInputService")
 infJumpConnection = UserInputService.JumpRequest:Connect(function()
     if infJumpActive then
@@ -534,34 +537,37 @@ infJumpButton.MouseButton1Click:Connect(function()
     updateStatus()
 end)
 
--- === 鏡頭距離控制 ===
-camButton.MouseButton1Click:Connect(function()
-    if not camActive then
+-- === 重力控制 (修改版) ===
+gravButton.MouseButton1Click:Connect(function()
+    if not gravActive then
         if not hasOriginalValues then getOriginalValues() end
-        camValue = tonumber(camInput.Text) or 120
-        camActive = true
-        camButton.Text = "解除"
-        camButton.BackgroundColor3 = Color3.fromRGB(244, 67, 54)
-        camInput.TextEditable = false
-        camFrame.BackgroundColor3 = Color3.fromRGB(227, 242, 253)
+        gravValue = tonumber(gravInput.Text) or 50
+        gravActive = true
+        gravButton.Text = "解除"
+        gravButton.BackgroundColor3 = Color3.fromRGB(244, 67, 54)
+        gravInput.TextEditable = false
+        gravFrame.BackgroundColor3 = Color3.fromRGB(227, 242, 253)
         
-        player.CameraMaxZoomDistance = camValue
-        player.CameraMinZoomDistance = 0.5
+        -- 設定重力
+        Workspace.Gravity = gravValue
         
-        if camConnection then camConnection:Disconnect() end
-        camConnection = player:GetPropertyChangedSignal("CameraMaxZoomDistance"):Connect(function()
-            if camActive and player.CameraMaxZoomDistance ~= camValue then
-                player.CameraMaxZoomDistance = camValue
+        -- (可選) 強制鎖定重力，防止遊戲改回
+        if gravConnection then gravConnection:Disconnect() end
+        gravConnection = Workspace:GetPropertyChangedSignal("Gravity"):Connect(function()
+            if gravActive and Workspace.Gravity ~= gravValue then
+                Workspace.Gravity = gravValue
             end
         end)
     else
-        camActive = false
-        camButton.Text = "啟動"
-        camButton.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
-        camInput.TextEditable = true
-        camFrame.BackgroundColor3 = Color3.fromRGB(248, 249, 250)
-        player.CameraMaxZoomDistance = originalCamDistance
-        if camConnection then camConnection:Disconnect() end
+        gravActive = false
+        gravButton.Text = "啟動"
+        gravButton.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
+        gravInput.TextEditable = true
+        gravFrame.BackgroundColor3 = Color3.fromRGB(248, 249, 250)
+        
+        -- 恢復原始重力
+        Workspace.Gravity = originalGravity
+        if gravConnection then gravConnection:Disconnect() end
     end
     updateStatus()
 end)
@@ -570,7 +576,7 @@ end)
 minimizeButton.MouseButton1Click:Connect(function() mainFrame.Visible = false; miniFrame.Visible = true end)
 expandButton.MouseButton1Click:Connect(function() miniFrame.Visible = false; mainFrame.Visible = true end)
 closeButton.MouseButton1Click:Connect(function()
-    -- 關閉前恢復
+    -- 關閉前恢復所有數值
     local char = player.Character
     if char then
         local hum = char:FindFirstChildOfClass("Humanoid")
@@ -581,22 +587,23 @@ closeButton.MouseButton1Click:Connect(function()
             end
         end
     end
-    if camActive then player.CameraMaxZoomDistance = originalCamDistance end
+    -- 恢復重力
+    if gravActive then Workspace.Gravity = originalGravity end
     
     if speedConnection then speedConnection:Disconnect() end
     if jumpConnection then jumpConnection:Disconnect() end
-    if camConnection then camConnection:Disconnect() end
+    if gravConnection then gravConnection:Disconnect() end
     if infJumpConnection then infJumpConnection:Disconnect() end
     
     screenGui:Destroy()
 end)
 
--- 重生處理
+-- 重生處理 (重力通常不需要在重生時重設，除非遊戲會在重生時覆寫它)
 player.CharacterAdded:Connect(function(char)
     local hum = char:WaitForChild("Humanoid")
     hasOriginalValues = false
     task.wait(0.2)
-    if not (speedActive or jumpActive or camActive or infJumpActive) then getOriginalValues() end
+    if not (speedActive or jumpActive or gravActive or infJumpActive) then getOriginalValues() end
     
     if speedActive then
         hum.WalkSpeed = speedValue
@@ -622,15 +629,8 @@ player.CharacterAdded:Connect(function(char)
         end
     end
     
-    if camActive then
-        player.CameraMaxZoomDistance = camValue
-        if camConnection then camConnection:Disconnect() end
-        camConnection = player:GetPropertyChangedSignal("CameraMaxZoomDistance"):Connect(function()
-            if camActive and player.CameraMaxZoomDistance ~= camValue then
-                player.CameraMaxZoomDistance = camValue
-            end
-        end)
-    end
+    -- 重力不需要特別在角色重生時設置，因為它是 Workspace 屬性
+    -- 但如果遊戲在重生點強制重置重力，這裡的邏輯（上面的 gravConnection）已經會自動處理
 end)
 
 -- 拖曳功能
@@ -662,4 +662,4 @@ end
 enableDrag(mainFrame, titleBar)
 enableDrag(miniFrame, miniFrame)
 
-print("速度/跳躍/無限跳控制器已載入 (CoreGui層級)")
+print("速度/跳躍/無限跳/重力控制器已載入 (CoreGui層級)")
