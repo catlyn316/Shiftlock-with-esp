@@ -317,10 +317,9 @@ local function loadShiftLock()
                             end
                             if not espBoxes[p] then espBoxes[p] = createESPBox(char) end
                             local dist = myHRP and (myHRP.Position - hrp.Position).Magnitude or 0
-                            local realSpeed = hrp.AssemblyLinearVelocity.Magnitude 
                             local lab = espLabels[p]
                             lab.billboard.Adornee = hrp
-                            lab.label.Text = string.format("名: %s\n血量: %.0f\n速度: %.1f\n距離: %.1f", p.Name, hum.Health, realSpeed, dist)
+                            lab.label.Text = string.format("名: %s\n血量: %.0f\n距離: %.1f", p.Name, hum.Health, dist)
                             local box = espBoxes[p]; box.Adornee = char; box.Size = char:GetExtentsSize()
                         else cleanupESP(p) end
                     end
