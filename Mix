@@ -215,8 +215,8 @@ local function loadShiftLock()
     end
 
     espBtn = createExtraBtn("ESP", 0)
-    nearBtn = createExtraBtn("最近", 30)
-    clickBtn = createExtraBtn("點擊", 60)
+    nearBtn = createExtraBtn("面向最近玩家", 30)
+    clickBtn = createExtraBtn("面向雙擊玩家", 60)
 
     -- 延伸按鈕邏輯與字色同步
     local extended = false
