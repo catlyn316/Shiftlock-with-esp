@@ -361,7 +361,15 @@ local function loadShiftLock()
         if lockMode ~= "none" then setFaceRotation(lockMode, targetPlayer) end
     end)
 
-    print("✅ ShiftLock + ESP 腳本已載入")
+    -- 初始化：自動啟動 ShiftLock
+    task.wait(0.1)
+    lockMode = "shiftlock"
+    lockMouse(true)
+    setFaceRotation("shiftlock")
+    icn.Image = "rbxasset://textures/ui/mouseLock_on.png"
+    Tw:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(38, 48, 60)}):Play()
+
+    print("✅ ShiftLock + ESP 腳本已載入（預設啟動 ShiftLock）")
 end
 
 task.spawn(function() pcall(loadShiftLock) end)
